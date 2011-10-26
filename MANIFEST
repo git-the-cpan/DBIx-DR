@@ -1,0 +1,13 @@
+Changes
+lib/DBIx/DR/Iterator.pm
+lib/DBIx/DR/PlaceHolders.pm
+lib/DBIx/DR.pm
+lib/DBIx/DR/Util.pm
+Makefile.PL
+MANIFEST
+t/000-dr-iterator.t
+t/010-dr-placeholders.t
+t/020-util.t
+t/030-dr.t
+t/sql/select.sql
+META.yml                                 Module meta-data (added by MakeMaker)
