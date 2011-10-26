@@ -31,11 +31,14 @@ END {
     remove_tree $temp_dir, { verbose => 0 };
     ok !-d $temp_dir, "Temporary dir was removed: $temp_dir";
 }
+my $test_dir = catfile(dirname($0), 'sql');
+ok -d $test_dir, 'Directory contained sqls is found: ' . $test_dir;
 
 ok -d $temp_dir, "Temporary directory was created: $temp_dir";
 my $db_file = "$temp_dir/db.sqlite";
 
-my $dbh = DBIx::DR->connect("dbi:SQLite:dbname=$db_file", '', '', {});
+my $dbh = DBIx::DR->connect(
+    "dbi:SQLite:dbname=$db_file", '', '', { dr_sql_dir => $test_dir });
 
 isa_ok $dbh => 'DBIx::DR::db', 'Connector was created';
 ok -r $db_file, 'Database file was created';
@@ -88,15 +91,13 @@ while(my $v = $res->next) {
 }
 
 
-my $test_dir = catfile(dirname($0), 'sql');
-ok -d $test_dir, 'Directory contained sqls is found: ' . $test_dir;
 
 my $select_file = catfile $test_dir, 'select.sql';
 ok -r $select_file, 'select.sql is found';
 
 ok !exists $dbh->{"private_DBIx::DR_cache"}{$select_file}, 'Cache is empty';
 $res = $dbh->dr_rows(
-    -f          => $select_file,
+    -f          => 'select',
     ids         => [ 1, 2 ],
     -hash       => 'id',
     -item       => 'my_item_package#new',

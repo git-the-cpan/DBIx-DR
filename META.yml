@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBIx-DR
-version:            0.01
+version:            0.02
 abstract:           easy DBI helper (named placeholders and blessed results)
 author:
     - Dmitry E. Oboukhov <unera@debian.org>

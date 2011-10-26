@@ -6,7 +6,7 @@ use DBIx::DR::Iterator;
 use DBIx::DR::Util ();
 
 package DBIx::DR;
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 use base 'DBI';
 use Carp;
 our @CARP_NOT;
@@ -42,6 +42,7 @@ package DBIx::DR::db;
 use base 'DBI::db';
 use DBIx::DR::PlaceHolders;
 use DBIx::DR::Util;
+use File::Spec::Functions qw(catfile);
 our @CARP_NOT;
 use Carp;
 
@@ -61,6 +62,10 @@ sub _dr_extract_args {
             $sql = $self->{"private_DBIx::DR_cache"}{$file};
         } else {
 
+            if (my $dir = $self->{"private_DBIx::DR_sql_dir"}) {{
+                $file = catfile($dir, $file) unless $file =~ m{^\/};
+            }}
+            $file .= '.sql' unless $file =~ /\.sql$/i;
             croak "SQL-file wasn't found" unless -r $file;
             open my $fh, '<:utf8', $file or croak "Can't open file $sql: $!";
             local $/;
