@@ -6,7 +6,7 @@ use DBIx::DR::Iterator;
 use DBIx::DR::Util ();
 
 package DBIx::DR;
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 use base 'DBI';
 use Carp;
 our @CARP_NOT;
@@ -131,7 +131,11 @@ sub dr_get {
 
     my $req = sql_transform $sql, $args;
 
-    my $res = $self->selectrow_hashref($sql, $args->{-dbi}, @{ $req->{vals} });
+    my $res = $self->selectrow_hashref(
+        $req->{sql}, $args->{-dbi}, @{ $req->{vals} }
+    );
+
+    return unless $res;
 
     my ($class, $method) = camelize $item;
     return $class->$method($res, undef) if $method;
@@ -211,7 +215,10 @@ All methods receives the following arguments:
 
 =item -f => $sql_file_name
 
-It will load SQL-request from file.
+It will load SQL-request from file. It will seek file in directory
+that was defined in L<dr_no_cache_sql> param of connect.
+
+You needn't to use suffixes (B<.sql>) here, but You can.
 
 =item -item => 'decamelized_obj_define'
 
@@ -224,6 +231,10 @@ It will bless (or construct) rowset into specified class.
 =item -dbi => HASHREF
 
 Additional DBI arguments.
+
+=item -hash => FIELDNAME
+
+Selects into HASH. Iterator will operate by names (not numbers).
 
 =back
 

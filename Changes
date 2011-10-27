@@ -5,3 +5,7 @@ Revision history for Perl extension DBIx::DR
 
 0.02  Thu Oct 27 01:29:36 MSK 2011
     - support dr_sql_dir option.
+
+0.03  Thu Oct 27 15:02:16 MSK 2011
+    - perldoc.
+    - fix dr_get function.

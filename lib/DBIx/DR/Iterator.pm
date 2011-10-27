@@ -183,6 +183,7 @@ sub AUTOLOAD {
 
 sub new {
     my ($class, $object, $iterator) = @_;
+    return unless defined $object;
     Carp::croak "Usage: DBIx::DR::Iterator::Item->new(HASHREF [, iterator ])"
         unless 'HASH' eq ref $object;
     my $self = bless $object => ref($class) || $class;

@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 57;
+use Test::More tests    => 60;
 use Encode qw(decode encode);
 
 
@@ -124,6 +124,14 @@ ok @a == $res->count, 'Rows count has well value';
 ok $a[0]->value eq $values[0], 'First item';
 ok $a[1]->value eq $values[1], 'Second item';
 
+
+$res = $dbh->dr_get('SELECT * FROM tbl WHERE id = ?{id}', id => 1);
+ok $res, 'Select one exists row';
+ok $res->id == 1, 'Identifier';
+ok $res->value eq $values[0], 'Value';
+
+
+$res = $dbh->dr_get('SELECT * FROM tbl WHERE id = ?{id}', id => 5000);
 
 package MyItemPackage;
 use base 'DBIx::DR::Iterator::Item';
