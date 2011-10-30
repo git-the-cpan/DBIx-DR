@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests => 55;
+use Test::More tests => 56;
 use Encode qw(decode encode);
 
 
@@ -167,14 +167,17 @@ $sql = q#
             ?%{(def)}{d,e},         -- :4
             ?{cde},                 -- :5
             ?qsub{ 'qsub' },        -- :6
-            ?sub{ 'sub' }           -- :7
+            ?sub{ 'sub' },          -- :7
+
+            ?!{indirect},           -- :8
 
 #;
 
 $res = sql_transform $sql,
     abc => [ 'a', 'b', 'c' ],
     def => [ { d => 'd1', e => 'e1' }, { d => 'd2', e => 'e2' } ],
-    cde => 'cde';
+    cde => 'cde',
+    indirect => 'Indirect';
 
 my @res = (
     'aaacdebbbcdeccc',
@@ -186,9 +189,12 @@ my @res = (
     'qsub'
 );
 
+# note explain $res;
+
 ok @{[ $res->{sql} =~ /\?/g ]} == @res, 'All placeholders';
 ok @{ $res->{vals} } == @res, 'PlaceHolders count';
-ok $res->{sql} =~ /^\s*sub\s+-- :7\s*$/ms, 'Indirect subroutine substitution';
+ok $res->{sql} =~ /^\s*Indirect,\s+-- :8\s*$/ms, 'Indirect substitution';
+ok $res->{sql} =~ /^\s*sub,\s+-- :7\s*$/ms, 'Indirect subroutine substitution';
 ok $res->{sql} =~ /^\s*\?,\s+-- :6\s*$/ms, 'Quoted subroutine substitution';
 ok $res->{sql} =~ /^\s*\?,\s+-- :5\s*$/ms, 'General substitution';
 ok $res->{sql} =~ /^\s*(\(\?,\?\)),\1,\s+-- :4\s*$/ms,

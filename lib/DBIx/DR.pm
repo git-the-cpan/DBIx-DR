@@ -6,10 +6,10 @@ use DBIx::DR::Iterator;
 use DBIx::DR::Util ();
 
 package DBIx::DR;
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 use base 'DBI';
 use Carp;
-our @CARP_NOT;
+$Carp::Internal{ (__PACKAGE__) } = 1;
 
 sub connect {
     my ($class, $dsn, $user, $auth, $attr) = @_;
@@ -37,14 +37,15 @@ sub connect {
 package DBIx::DR::st;
 use base 'DBI::st';
 use Carp;
+$Carp::Internal{ (__PACKAGE__) } = 1;
 
 package DBIx::DR::db;
 use base 'DBI::db';
 use DBIx::DR::PlaceHolders;
 use DBIx::DR::Util;
 use File::Spec::Functions qw(catfile);
-our @CARP_NOT;
 use Carp;
+$Carp::Internal{ (__PACKAGE__) } = 1;
 
 sub _dr_extract_args {
     my $self = shift;
@@ -66,7 +67,7 @@ sub _dr_extract_args {
                 $file = catfile($dir, $file) unless $file =~ m{^\/};
             }}
             $file .= '.sql' unless $file =~ /\.sql$/i;
-            croak "SQL-file wasn't found" unless -r $file;
+            croak "SQL-file wasn't found: $file" unless -r $file;
             open my $fh, '<:utf8', $file or croak "Can't open file $sql: $!";
             local $/;
             $sql = <$fh>;
@@ -96,7 +97,9 @@ sub _dr_extract_args {
 sub dr_do {
     my ($self, $sql, $args)= &_dr_extract_args;
     my $req = sql_transform $sql, $args;
-    return $self->do($req->{sql}, $args->{-dbi}, @{ $req->{vals} });
+    my $res = eval{ $self->do($req->{sql}, $args->{-dbi}, @{ $req->{vals} }); };
+    croak $@ if $@;
+    return $res;
 }
 
 
@@ -107,17 +110,21 @@ sub dr_rows {
     my $req = sql_transform $sql, $args;
     my $res;
 
-    if ($args->{-hash}) {
-        $res = $self->selectall_hashref(
-            $req->{sql}, $args->{-hash}, $args->{-dbi}, @{ $req->{vals} }
-        );
-    } else {
-        my $dbi = $args->{-dbi} // {};
-        croak '-dbi argument must be HASHREF' unless 'HASH' eq ref $dbi;
-        $res = $self->selectall_arrayref(
-            $req->{sql}, { %$dbi, Slice => {} }, @{ $req->{vals} }
-        );
-    }
+    eval {
+        if ($args->{-hash}) {
+            $res = $self->selectall_hashref(
+                $req->{sql}, $args->{-hash}, $args->{-dbi}, @{ $req->{vals} }
+            );
+        } else {
+            my $dbi = $args->{-dbi} // {};
+            croak '-dbi argument must be HASHREF' unless 'HASH' eq ref $dbi;
+            $res = $self->selectall_arrayref(
+                $req->{sql}, { %$dbi, Slice => {} }, @{ $req->{vals} }
+            );
+        }
+    };
+
+    croak $@ if $@;
 
     my ($class, $method) = camelize $iterator;
 
@@ -131,9 +138,14 @@ sub dr_get {
 
     my $req = sql_transform $sql, $args;
 
-    my $res = $self->selectrow_hashref(
-        $req->{sql}, $args->{-dbi}, @{ $req->{vals} }
-    );
+
+    my $res = eval {
+        $self->selectrow_hashref(
+            $req->{sql}, $args->{-dbi}, @{ $req->{vals} }
+        );
+    };
+
+    croak $@  if $@;
 
     return unless $res;
 
@@ -319,6 +331,11 @@ Result like:
 
     sprintf "SELECT * FROM tbl WHERE id = %s", $object->id_important;
 
+
+=head2 C<?!{path}>
+
+Indirect substitution. It won't use quoting. Value defined by 'B<path>' will
+be inplaced as is. B<Be careful>: You can create SQL-inject predisposed code.
 
 =head2 C<?fmt{path}{string}>
 

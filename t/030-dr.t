@@ -38,7 +38,13 @@ ok -d $temp_dir, "Temporary directory was created: $temp_dir";
 my $db_file = "$temp_dir/db.sqlite";
 
 my $dbh = DBIx::DR->connect(
-    "dbi:SQLite:dbname=$db_file", '', '', { dr_sql_dir => $test_dir });
+    "dbi:SQLite:dbname=$db_file", '', '',
+    {
+            dr_sql_dir => $test_dir,
+            RaiseError      => 1,
+            PrintError      => 0,
+            PrintWarn       => 0,
+    });
 
 isa_ok $dbh => 'DBIx::DR::db', 'Connector was created';
 ok -r $db_file, 'Database file was created';

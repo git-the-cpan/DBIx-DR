@@ -144,6 +144,28 @@ sub all {
     return @res;
 }
 
+sub first {
+    my ($self) = @_;
+
+    if ($self->{is_array}) {
+        return ($self->{iterator} == 1) ? 1 : 0;
+    }
+
+    croak "'first' and 'last' methods aren't provided for hashiterators";
+    return;
+}
+
+sub last {
+    my ($self) = @_;
+
+    if ($self->{is_array}) {
+        return ($self->{iterator} == $self->{count}) ? 1 : 0;
+    }
+
+    croak "'first' and 'last' methods aren't provided for hashiterators";
+    return;
+}
+
 package DBIx::DR::Iterator::Item;
 use Scalar::Util ();
 use Carp ();
@@ -205,6 +227,13 @@ sub is_changed {
     }}
     return $self->{is_changed};
 }
+
+sub can {
+    my ($self, $method) = @_;
+    return 1 if ref $self and exists $self->{$method};
+    return $self->SUPER::can($method);
+}
+
 
 1;
 

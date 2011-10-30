@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBIx-DR
-version:            0.03
+version:            0.04
 abstract:           easy DBI helper (named placeholders and blessed results)
 author:
     - Dmitry E. Oboukhov <unera@debian.org>
@@ -11,12 +11,13 @@ configure_requires:
 build_requires:
     DBD::SQLite:  1
 requires:
-    DBI:  1.4
+    DBD::SQLite:  1
+    DBI:          1.4
 no_index:
     directory:
         - t
         - inc
-generated_by:       ExtUtils::MakeMaker version 6.56
+generated_by:       ExtUtils::MakeMaker version 6.55_02
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4

@@ -9,5 +9,6 @@ t/000-dr-iterator.t
 t/010-dr-placeholders.t
 t/020-util.t
 t/030-dr.t
+t/benchmarks/01_transform.pl
 t/sql/select.sql
 META.yml                                 Module meta-data (added by MakeMaker)

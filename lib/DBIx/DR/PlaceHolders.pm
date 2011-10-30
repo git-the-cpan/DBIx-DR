@@ -14,7 +14,7 @@ my $field_re  = qr{[a-zA-Z_][a-zA-Z0-9_]*};
 my $path_re   = qr{[\.:]?$field_re(?:[\.:]$field_re)*};
 
 sub val_by_path($$) {
-    my ($path, $val) = @_;
+    my ($path, $value) = @_;
 
     $path = ".$path" unless $path =~ /^[\.:]/;
 
@@ -22,27 +22,29 @@ sub val_by_path($$) {
     shift @sp;
 
     my $rp = '';
+
+    my $ref = $value;
     for (my $i = 0; $i < @sp; $i++) {
         if ($sp[$i] eq '.') {
             $i++;
             $rp .= ".$sp[$i]";
-            croak "Path $rp is not a HASH" unless 'HASH' eq ref $val;
-            $val = $val->{ $sp[$i] };
+            croak "Path $rp is not a HASH" unless 'HASH' eq ref $ref;
+            $ref = $ref->{ $sp[$i] };
             next;
         }
 
         if ($sp[$i] eq ':') {
             my $method = $sp[++$i];
             $rp .= ":$sp[$i]";
-            croak "Path $rp is not an OBJECT" unless blessed $val;
-            croak "Method '$method' is not found" unless $val->can($method);
-            $val = $val->$method;
+            croak "Path $rp is not an OBJECT" unless blessed $ref;
+            croak "Method '$method' is not found" unless $ref->can($method);
+            $ref = $ref->$method;
             next;
         }
 
         croak "Internal error: can't parse path: $path";
     }
-    return $val;
+    return $ref;
 }
 
 sub exists_path($$) {
@@ -215,7 +217,7 @@ sub sql_transform($;@) {
 
 
     # ?{name} and ?@{name}
-    while($sql =~ s# \? (\@)?  \{ \s* ( $path_re ) \s* \} ##xs) {
+    while($sql =~ s# \? (\@|\!)?  \{ \s* ( $path_re ) \s* \} ##xs) {
         my $before      = $`;
         my $found       = $&;
         my $mod         = $1;
@@ -233,6 +235,9 @@ sub sql_transform($;@) {
             push @vals => @$val;
             substr $sql, length($before), 0,
                 join ',' => map '?' . $no++ => @$val;
+            next;
+        } elsif ($mod eq '!') {
+            substr $sql, length($before), 0, $val if defined $val;
             next;
         }
         croak "Internal error: unknown modifier: $mod";

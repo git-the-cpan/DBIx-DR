@@ -9,3 +9,6 @@ Revision history for Perl extension DBIx::DR
 0.03  Thu Oct 27 15:02:16 MSK 2011
     - perldoc.
     - fix dr_get function.
+
+0.04  Thu Oct 27 18:21:16 MSK 2011
+    - add indirect substitutions.
