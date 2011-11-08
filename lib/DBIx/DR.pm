@@ -7,7 +7,7 @@ use DBIx::DR::Util ();
 use DBIx::DR::PlPlaceHolders;
 
 package DBIx::DR;
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 use base 'DBI';
 use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
@@ -171,7 +171,7 @@ __END__
 
 =head1 NAME
 
-DBIx::DR - easy DBI helper (named placeholders and blessed results)
+DBIx::DR - easy DBI helper (perl inside SQL and blessed results)
 
 =head1 SYNOPSIS
 
@@ -186,7 +186,7 @@ DBIx::DR - easy DBI helper (named placeholders and blessed results)
         'SELECT * FROM tbl WHERE id IN (<% list @$ids %>)',
         ids => [ 123, 456 ]
     );
-    my $rowset = $dbh->select(-f => 'sqlfile.sql', ids => [ 123, 456 ]);
+    my $rowset = $dbh->select(-f => 'sqlfile.sql.ep', ids => [ 123, 456 ]);
 
     while(my $row = $rowset->next) {
         print "id: %d, value: %s\n", $row->id, $row->value;
@@ -194,13 +194,13 @@ DBIx::DR - easy DBI helper (named placeholders and blessed results)
 
 =head1 DESCRIPTION
 
-The package B<extends> L<DBI> and allows You:
+The package I<extends> L<DBI> and allows You:
 
 =over
 
 =item *
 
-to use named placeholders;
+to use perl inside Your SQL requests;
 
 =item *
 
@@ -221,12 +221,13 @@ to use usual L<DBI> methods.
 
 =head2 dr_iterator
 
-A string describes iterator class. Default value is 'B<dbix-dr-iterator#new>'.
+A string describes iterator class.
+Default value is 'B<dbix-dr-iterator#new>' (decamelized string).
 
 =head2 dr_item
 
 A string describes item (one row) class.
-Default value is 'B<dbix-dr-iterator-item#new>'.
+Default value is 'B<dbix-dr-iterator-item#new>' (decamelized string).
 
 =head2 dr_sql_dir
 
@@ -234,7 +235,7 @@ Directory path to seek sql files (If You use dedicated SQLs).
 
 =head1 METHODS
 
-All methods receives the following arguments:
+All methods can receive the following arguments:
 
 =over
 
@@ -243,15 +244,17 @@ All methods receives the following arguments:
 It will load SQL-request from file. It will seek file in directory
 that was defined in L<dr_sql_dir> param of connect.
 
-You needn't to use suffixes (B<.sql>) here, but You can.
+You needn't to use suffixes (B<.sql.ep>) here, but You can.
 
 =item -item => 'decamelized_obj_define'
 
 It will bless (or construct) row into specified class. See below.
+Default value defined by L<dr_item> argument of B<DBI::connect>.
 
 =item -iterator => 'decamelized_obj_define'
 
 It will bless (or construct) rowset into specified class.
+Default value defined by L<dr_iterator> argument of B<DBI::connect>.
 
 =item -dbi => HASHREF
 
@@ -276,7 +279,7 @@ Are strings that represent class [ and method ].
 Does SQL-request like 'B<UPDATE>', 'B<INSERT>', etc.
 
     $dbh->perform($sql, value => 1, other_value => 'abc');
-    $dbh->perform(-f => $sql_file_name, value => 1m other_value => 'abc');
+    $dbh->perform(-f => $sql_file_name, value => 1, other_value => 'abc');
 
 
 =head2 select
@@ -321,15 +324,15 @@ You can use perl inside Your SQL requests:
     % my $gid = POSIX::getgid;
 
 
-There are two function is available inside perl:
+There are two functions available inside perl:
 
 
 =head2 quote
 
-Replaces argument to '?', add argument value into bindlist.
+Replaces argument to 'B<?>', add argument value into bindlist.
 You can also use shortcut 'B<=>' instead of the function.
 
-=head3 Example 1
+B<Example 1>
 
     SELECT
         *
@@ -338,7 +341,7 @@ You can also use shortcut 'B<=>' instead of the function.
     WHERE
         id = <% quote $id %>
 
-=head4 Result
+B<Result>
 
     SELECT
         *
@@ -347,12 +350,12 @@ You can also use shortcut 'B<=>' instead of the function.
     WHERE
         id = ?
 
-and L<bind_values> will contain B<id> value.
+and L<bindlist> will contain B<id> value.
 
-If You use B<DBIx::DR::ByteStream> in place of string the function will
-recall L<immediate> function.
+If You use L<DBIx::DR::ByteStream> in place of string
+the function will recall L<immediate> function.
 
-=head3 Example 2
+B<Example 2>
 
     SELECT
         *
@@ -368,7 +371,7 @@ Replaces argument to its value.
 You can also use shortcut 'B<==>' instead of the function.
 
 
-=head3 Example 1
+B<Example 1>
 
     SELECT
         *
@@ -378,7 +381,7 @@ You can also use shortcut 'B<==>' instead of the function.
         id = <% immediate $id %>
 
 
-=head4 Result
+B<Result>
 
     SELECT
         *
@@ -392,7 +395,7 @@ Where 123 is B<id> value.
 Be carful! Using the operator You can produce code that will be
 amenable to SQL-injection.
 
-=head3 Example 2
+B<Example 2>
 
     SELECT
         *
@@ -429,13 +432,13 @@ Expands array into Your SQL request.
     WHERE
         status IN (?,?,? ...)
 
-and L<bind_values> will contain B<ids> values.
+and B<bindlist> will contain B<ids> values.
 
 
 =head2 hlist
 
 Expands array of hash into Your SQL request. The first argument can
-be list of required keys. Places each group into brackets.
+be a list of required keys. Places each group into brackets.
 
 =head3 Example
 
@@ -457,7 +460,7 @@ be list of required keys. Places each group into brackets.
         (?, ?), (?, ?) ...
 
 
-and L<bind_values> will contain all B<inserts> values.
+and B<bindlist> will contain all B<inserts> values.
 
 
 =head2 include

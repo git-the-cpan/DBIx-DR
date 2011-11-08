@@ -20,3 +20,5 @@ Revision history for Perl extension DBIx::DR
     - back-incompatible changes (bump version)
       - switches to perlish template
       - rewite documentation
+0.12  Tue Nov  8 14:54:15 MSK 2011
+    - a few fixes in perldoc
