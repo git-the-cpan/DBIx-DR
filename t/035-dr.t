@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 60;
+use Test::More tests    => 61;
 use Encode qw(decode encode);
 
 
@@ -22,7 +22,7 @@ BEGIN {
     use_ok 'DBD::SQLite';
     use_ok 'File::Temp', 'tempdir';
     use_ok 'File::Path', 'remove_tree';
-    use_ok 'File::Spec::Functions', 'catfile';
+    use_ok 'File::Spec::Functions', 'catfile', 'rel2abs';
     use_ok 'File::Basename', 'dirname', 'basename';
 }
 
@@ -54,27 +54,29 @@ ok $dbh->{'private_DBIx::DR_iterator'} eq 'dbix-dr-iterator#new',
 ok $dbh->{'private_DBIx::DR_item'} eq 'dbix-dr-iterator-item#new',
     'Default item class';
 
-my $res =
-    $dbh->dr_do('CREATE TABLE tbl (id INTEGER PRIMARY KEY, value CARCHAR(32))');
+my $res = $dbh->perform(q{
+        CREATE TABLE tbl (id INTEGER PRIMARY KEY, value CARCHAR(32))
+    }
+);
 ok $res ~~ '0E0', 'Table tbl was created';
 
 my @values = (1, 2, 3, 4, 6, 'abc', 'def');
 for(@values) {
-    $res = $dbh->dr_do(
-        'INSERT INTO tbl (value) VALUES (?{value})',
+    $res = $dbh->perform(
+        'INSERT INTO tbl (value) VALUES (<%= $value %>)',
         value  => $_
     );
 
     ok $res && $res ne '0E0', 'Array item was inserted';
 }
 
-$res = $dbh->dr_do(q[
+$res = $dbh->perform(q[
         UPDATE
             tbl
         SET
-            value = value || ?{suffix}
+            value = value || <%= $suffix %>
         WHERE
-            id > ?{id_limit}
+            id > <%= $id_limit %>
     ],
     suffix => '_suffix',
     id_limit => 2
@@ -83,7 +85,7 @@ $res = $dbh->dr_do(q[
 
 ok $res == @values - 2, 'Updated was passed';
 
-$res = $dbh->dr_rows('SELECT * FROM tbl');
+$res = $dbh->select('SELECT * FROM tbl');
 isa_ok $res => 'DBIx::DR::Iterator', 'A few rows were fetched';
 ok $res->count == @values, 'Rows count has well value';
 while(my $v = $res->next) {
@@ -98,12 +100,11 @@ while(my $v = $res->next) {
 
 
 
-my $select_file = catfile $test_dir, 'select.sql';
+my $select_file = catfile $test_dir, 'select_ids.sql.ep';
 ok -r $select_file, 'select.sql is found';
 
-ok !exists $dbh->{"private_DBIx::DR_cache"}{$select_file}, 'Cache is empty';
-$res = $dbh->dr_rows(
-    -f          => 'select',
+$res = $dbh->select(
+    -f          => 'select_ids',
     ids         => [ 1, 2 ],
     -hash       => 'id',
     -item       => 'my_item_package#new',
@@ -114,9 +115,9 @@ ok 'HASH' eq ref $res->{fetch}, 'SELECT was done';
 ok $res->count == 2, 'Rows count has well value';
 ok $res->get(1)->value eq $values[0], 'First item';
 ok $res->get(2)->value eq $values[1], 'Second item';
-ok exists $dbh->{"private_DBIx::DR_cache"}{$select_file}, 'Cache is full';
-$res = $dbh->dr_rows(
-    -f          => $select_file,
+
+$res = $dbh->select(
+    -f          => rel2abs($select_file),
     ids         => [ 1, 2 ],
     -hash       => 'id',
     -item       => 'my_item_package#new',
@@ -131,13 +132,29 @@ ok $a[0]->value eq $values[0], 'First item';
 ok $a[1]->value eq $values[1], 'Second item';
 
 
-$res = $dbh->dr_get('SELECT * FROM tbl WHERE id = ?{id}', id => 1);
+$res = $dbh->single('SELECT * FROM tbl WHERE id = <%= $id %>', id => 1);
 ok $res, 'Select one exists row';
 ok $res->id == 1, 'Identifier';
 ok $res->value eq $values[0], 'Value';
 
 
-$res = $dbh->dr_get('SELECT * FROM tbl WHERE id = ?{id}', id => 5000);
+$res = $dbh->single('SELECT * FROM tbl WHERE id = <%= $id %>', id => 5000);
+ok !$res, 'No results';
+
+
+$dbh->set_helper(
+    foo => sub { 'foo' },
+    bar => sub { $_[0]->call_helper('foo') . 'bar' },
+);
+
+$res = $dbh->single('SELECT <%= foo %> AS foo');
+ok $res->foo eq 'foo', 'User helper';
+
+$res = $dbh->single('SELECT <%= bar %> AS bar');
+ok $res->bar eq 'foobar', 'User helper (call the other helper)';
+
+
+
 
 package MyItemPackage;
 use base 'DBIx::DR::Iterator::Item';

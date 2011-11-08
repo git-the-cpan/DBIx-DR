@@ -4,9 +4,10 @@ use warnings;
 
 use DBIx::DR::Iterator;
 use DBIx::DR::Util ();
+use DBIx::DR::PlPlaceHolders;
 
 package DBIx::DR;
-our $VERSION = '0.04';
+our $VERSION = '0.11';
 use base 'DBI';
 use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
@@ -26,10 +27,10 @@ sub connect {
 
     $dbh->{"private_DBIx::DR_sql_dir"} = $attr->{dr_sql_dir};
 
-    $dbh->{"private_DBIx::DR_no_cache"} = 1
-        if $attr->{dr_no_cache_sql};
+    $dbh->{"private_DBIx::DR_template"} = DBIx::DR::PlPlaceHolders->new(
+        sql_dir     => $attr->{dr_sql_dir},
 
-    $dbh->{"private_DBIx::DR_cache"} = {};
+    );
 
     return $dbh;
 }
@@ -41,90 +42,80 @@ $Carp::Internal{ (__PACKAGE__) } = 1;
 
 package DBIx::DR::db;
 use base 'DBI::db';
-use DBIx::DR::PlaceHolders;
 use DBIx::DR::Util;
 use File::Spec::Functions qw(catfile);
 use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
 
-sub _dr_extract_args {
+
+sub set_helper {
+    my ($self, %opts) = @_;
+    $self->{"private_DBIx::DR_template"}->set_helper(%opts);
+}
+
+sub _dr_extract_args_ep {
     my $self = shift;
 
-    my ($sql, %args);
+    my (@sql, %args);
 
     if (@_ % 2) {
-        ($sql, %args) = @_;
+        ($sql[0], %args) = @_;
+        delete $args{-f};
     } else {
         %args = @_;
-        my $file = $args{-f};
-        croak "SQL-file wasn't defined" unless $file;
-
-        if (exists $self->{"private_DBIx::DR_cache"}{$file}) {
-            $sql = $self->{"private_DBIx::DR_cache"}{$file};
-        } else {
-
-            if (my $dir = $self->{"private_DBIx::DR_sql_dir"}) {{
-                $file = catfile($dir, $file) unless $file =~ m{^\/};
-            }}
-            $file .= '.sql' unless $file =~ /\.sql$/i;
-            croak "SQL-file wasn't found: $file" unless -r $file;
-            open my $fh, '<:utf8', $file or croak "Can't open file $sql: $!";
-            local $/;
-            $sql = <$fh>;
-
-            $self->{"private_DBIx::DR_cache"}{$file} = $sql
-                unless $self->{"private_DBIx::DR_no_cache"};
-        }
     }
 
     my $iterator = $args{-iterator} || $self->{'private_DBIx::DR_iterator'};
     my $item = $args{-item} || $self->{'private_DBIx::DR_item'};
 
-
     croak "Iterator class was not defined" unless $iterator;
     croak "Item class was not definded" unless $item;
-    croak "SQL wan't defined" unless $sql;
+    croak "SQL wasn't defined" unless @sql or $args{-f};
 
     return (
         $self,
-        $sql,
+        \@sql,
         \%args,
         $item,
         $iterator,
     );
 }
 
-sub dr_do {
-    my ($self, $sql, $args)= &_dr_extract_args;
-    my $req = sql_transform $sql, $args;
-    my $res = eval{ $self->do($req->{sql}, $args->{-dbi}, @{ $req->{vals} }); };
-    croak $@ if $@;
-    return $res;
-}
+sub select {
+    my ($self, $sql, $args, $item, $iterator) = &_dr_extract_args_ep;
 
+    my $req = $self->{"private_DBIx::DR_template"}->sql_transform(
+        @$sql,
+        %$args
+    );
 
-sub dr_rows {
-
-    my ($self, $sql, $args, $item, $iterator) = &_dr_extract_args;
-
-    my $req = sql_transform $sql, $args;
     my $res;
 
-    eval {
-        if ($args->{-hash}) {
-            $res = $self->selectall_hashref(
-                $req->{sql}, $args->{-hash}, $args->{-dbi}, @{ $req->{vals} }
+    if (exists $args->{-hash}) {
+        $res = eval {
+            $self->selectall_hashref(
+                $req->sql,
+                $args->{-hash},
+                $args->{-dbi},
+                $req->bind_values
             );
-        } else {
-            my $dbi = $args->{-dbi} // {};
-            croak '-dbi argument must be HASHREF' unless 'HASH' eq ref $dbi;
-            $res = $self->selectall_arrayref(
-                $req->{sql}, { %$dbi, Slice => {} }, @{ $req->{vals} }
-            );
-        }
-    };
+        };
 
-    croak $@ if $@;
+        croak $@ if $@;
+
+    } else {
+        my $dbi = $args->{-dbi} // {};
+        croak "argument '-dbi' must be HASHREF or undef"
+            unless 'HASH' eq ref $dbi;
+        $res = eval {
+            $self->selectall_arrayref(
+                $req->sql,
+                { %$dbi, Slice => {} },
+                $req->bind_values
+            );
+        };
+        croak $@ if $@;
+    }
 
     my ($class, $method) = camelize $iterator;
 
@@ -132,26 +123,46 @@ sub dr_rows {
     return bless $res => $class;
 }
 
-sub dr_get {
-
-    my ($self, $sql, $args, $item) = &_dr_extract_args;
-
-    my $req = sql_transform $sql, $args;
-
+sub single {
+    my ($self, $sql, $args, $item) = &_dr_extract_args_ep;
+    my $req = $self->{"private_DBIx::DR_template"}->sql_transform(
+        @$sql,
+        %$args
+    );
 
     my $res = eval {
         $self->selectrow_hashref(
-            $req->{sql}, $args->{-dbi}, @{ $req->{vals} }
+            $req->sql,
+            $args->{-dbi},
+            $req->bind_values
         );
     };
-
-    croak $@  if $@;
+    croak $@ if $@;
 
     return unless $res;
 
     my ($class, $method) = camelize $item;
     return $class->$method($res, undef) if $method;
     return bless $res => $class;
+}
+
+sub perform {
+    my ($self, $sql, $args) = &_dr_extract_args_ep;
+    my $req = $self->{"private_DBIx::DR_template"}->sql_transform(
+        @$sql,
+        %$args
+    );
+
+    my $res = eval {
+        $self->do(
+            $req->sql,
+            $args->{-dbi},
+            $req->bind_values
+        );
+    };
+    croak $@ if $@;
+
+    return $res;
 }
 
 1;
@@ -166,9 +177,16 @@ DBIx::DR - easy DBI helper (named placeholders and blessed results)
 
     my $dbh = DBIx::DR->connect($dsn, $login, $passed);
 
-    $dbh->dr_do('SELECT * FROM tbl WHERE id = ?{id}', id => 123);
+    $dbh->perform(
+        'UPDATE tbl SET a = 1 WHERE id = <%= $id %>',
+        id => 123
+    );
 
-    my $rowset = $dbh->dr_rows(-f => 'sqlfile.sql', ids => [ 123, 456 ]);
+    my $rowset = $dbh->select(
+        'SELECT * FROM tbl WHERE id IN (<% list @$ids %>)',
+        ids => [ 123, 456 ]
+    );
+    my $rowset = $dbh->select(-f => 'sqlfile.sql', ids => [ 123, 456 ]);
 
     while(my $row = $rowset->next) {
         print "id: %d, value: %s\n", $row->id, $row->value;
@@ -176,7 +194,7 @@ DBIx::DR - easy DBI helper (named placeholders and blessed results)
 
 =head1 DESCRIPTION
 
-The package extends L<DBI> and allows You:
+The package B<extends> L<DBI> and allows You:
 
 =over
 
@@ -214,11 +232,6 @@ Default value is 'B<dbix-dr-iterator-item#new>'.
 
 Directory path to seek sql files (If You use dedicated SQLs).
 
-=head2 dr_no_cache_sql
-
-If this param is B<true>, L<DBIx::DR> wont cache SQLs that were read from
-external files.
-
 =head1 METHODS
 
 All methods receives the following arguments:
@@ -228,7 +241,7 @@ All methods receives the following arguments:
 =item -f => $sql_file_name
 
 It will load SQL-request from file. It will seek file in directory
-that was defined in L<dr_no_cache_sql> param of connect.
+that was defined in L<dr_sql_dir> param of connect.
 
 You needn't to use suffixes (B<.sql>) here, but You can.
 
@@ -258,27 +271,27 @@ Are strings that represent class [ and method ].
  foo_bar#subroutine     => FooBar->subroutine
  foo_bar-baz            => FooBar::Baz
 
-=head2 dr_do
+=head2 perform
 
 Does SQL-request like 'B<UPDATE>', 'B<INSERT>', etc.
 
-    $dbh->dr_do($sql, value => 1, other_value => 'abc');
-    $dbh->dr_do(-f => $sql_file_name, value => 1m other_value => 'abc');
+    $dbh->perform($sql, value => 1, other_value => 'abc');
+    $dbh->perform(-f => $sql_file_name, value => 1m other_value => 'abc');
 
 
-=head2 dr_rows
+=head2 select
 
 Does SQL-request, pack results into iterator class. By default it uses
 L<DBIx::DR::Iterator> class.
 
-    my $res = $dbh->dr_rows(-f => $sql_file_name, value => 1);
+    my $res = $dbh->select(-f => $sql_file_name, value => 1);
     while(my $row = $res->next) {
         printf "RowId: %d, RowValue: %s\n", $row->id, $row->value;
     }
 
     my $row = $row->get(15);  # row 15
 
-    my $res = $dbh->dr_rows(-f => $sql_file_name,
+    my $res = $dbh->select(-f => $sql_file_name,
             value => 1, -hash => 'name');
     while(my $row = $res->next) {
         printf "RowId: %d, RowName: %s\n", $row->id, $row->name;
@@ -286,7 +299,7 @@ L<DBIx::DR::Iterator> class.
 
     my $row = $row->get('Vasya');  # row with name eq 'Vasya'
 
-=head2 dr_get
+=head2 single
 
 Does SQL-request that returns one row. Pack results into item class.
 Does SQL-request, pack results (one row) into item class. By default it
@@ -294,240 +307,205 @@ uses L<DBIx::DR::Iterator::Item|DBIx::DR::Iterator/DBIx::DR::Iterator::Item>
 class.
 
 
-=head1 SQL placeholders
+=head1 Template language
+
+You can use perl inside Your SQL requests:
+
+    % my $foo = 1;
+    % my $bar = 2;
+    <% my $foo_bar = $foo + $bar %>
+
+    ..
+
+    % use POSIX;
+    % my $gid = POSIX::getgid;
 
 
-There are a few types of substitution:
+There are two function is available inside perl:
 
-=head2 C<?{path}>
 
-General substitution. It will be replaced by item defined by 'B<path>'.
+=head2 quote
+
+Replaces argument to '?', add argument value into bindlist.
+You can also use shortcut 'B<=>' instead of the function.
 
 =head3 Example 1
 
-    $sql = q[ SELECT * FROM tbl WHERE id = ?{id} ];
-    $rows = $dbh->dr_rows($sql, id => 123);
+    SELECT
+        *
+    FROM
+        tbl
+    WHERE
+        id = <% quote $id %>
 
-Result:
+=head4 Result
 
-    SELECT * FROM tbl WHERE id = 123
+    SELECT
+        *
+    FROM
+        tbl
+    WHERE
+        id = ?
+
+and L<bind_values> will contain B<id> value.
+
+If You use B<DBIx::DR::ByteStream> in place of string the function will
+recall L<immediate> function.
 
 =head3 Example 2
 
-    $sql = q[ SELECT * FROM tbl WHERE id = ?{ids.id_important} ];
-    $rows = $dbh->dr_rows($sql, ids => { id_important => 123 });
-
-Result:
-
-    SELECT * FROM tbl WHERE id = 123
-
-=head3 Example 3
-
-    $sql = q[ SELECT * FROM tbl WHERE id = ?{ids:id_important} ];
-    # object MUST have 'id_important' method
-    $rows = $dbh->dr_rows($sql, ids => $object);
-
-Result like:
-
-    sprintf "SELECT * FROM tbl WHERE id = %s", $object->id_important;
+    SELECT
+        *
+    FROM
+        tbl
+    WHERE
+        id = <%= $id %>
 
 
-=head2 C<?!{path}>
+=head2 immediate
 
-Indirect substitution. It won't use quoting. Value defined by 'B<path>' will
-be inplaced as is. B<Be careful>: You can create SQL-inject predisposed code.
+Replaces argument to its value.
+You can also use shortcut 'B<==>' instead of the function.
 
-=head2 C<?fmt{path}{string}>
-
-Formatted substitution. All symbols 'B<?>' in 'B<string> will be
-replaced by value defined by 'B<path>'.
 
 =head3 Example 1
 
-    $sql = q[ SELECT * FROM tbl where col like ?fmt{filter}{%?%} ]
-    $rows = $dbh->dr_rows($sql, filter => 'abc');
-
-Result:
-
-    SELECT * FROM tbl where col like '%abc%'
-
-=head2 C<?@{path}>
-
-Array substitution. It will be replaced by items from
-array defined by 'B<path>'.
-
-=head3 Example 1
-
-    $sql = q[ SELECT * FROM tbl WHERE id IN ( ?@{ids} ) ];
-    $rows = $dbh->dr_rows($sql, ids => [ 1, 2, 3, 4 ]);
-
-Result:
-
-    SELECT * FROM tbl WHERE id IN ( 1, 2, 3, 4 )
-
-=head2 C<?@{(path)}>
-
-Array substitution. It will be replaced by items from
-array defined by 'B<path>'. Each element will be in brackets.
-
-=head3 Example 1
-
-    $sql = q[ INSERT INTO tbl (value) VALUES ?@{(values)} ];
-    $dbh->dr_do($sql, values => [ 1, 2, 3, 4 ]);
-
-Result:
-
-    INSERT INTO tbl (value) VALUES (1), (2), (3), (4);
-
-=head2 C<?%{path}{subpath1,subpath2...}>
-
-Array substitution. Array (B<path>) of hashes will be expanded.
-
-=head3 Example 1
-
-    $sql = q[ INSERT INTO
-            tbl (id, value)
-        VALUES (?%{values}{id,value})
-    ];
-    $dbh->dr_do($sql, values => [ { id => 1, value => 'abc' } ]);
-
-Result:
-
-    INSERT INTO tbl (id, value) VALUES (1, 'abc')
+    SELECT
+        *
+    FROM
+        tbl
+    WHERE
+        id = <% immediate $id %>
 
 
-=head2 C<?%{(path)}{subpath1,subpath2...}>
+=head4 Result
 
-Array substitution. Array (B<path>) of hashes will be expanded.
-Each elementset will be in brackets.
+    SELECT
+        *
+    FROM
+        tbl
+    WHERE
+        id = 123
 
-=head3 Example 1
+Where 123 is B<id> value.
 
-    $sql = q[
-        INSERT INTO
-            tbl (id, value)
-        VALUES (?%{values}{id,value})
-    ];
-    $dbh->dr_do(
-        $sql,
-        values => [
-            { id => 1, value => 'abc' },
-            { id => 2, value => 'cde' }
-        ]
+Be carful! Using the operator You can produce code that will be
+amenable to SQL-injection.
+
+=head3 Example 2
+
+    SELECT
+        *
+    FROM
+        tbl
+    WHERE
+        id = <%== $id %>
+
+
+
+=head1 Helpers
+
+There are a few default helpers.
+
+=head2 list
+
+Expands array into Your SQL request.
+
+=head3 Example
+
+    SELECT
+        *
+    FROM
+        tbl
+    WHERE
+        status IN (<% list @$ids %>)
+
+=head4 Result
+
+    SELECT
+        *
+    FROM
+        tbl
+    WHERE
+        status IN (?,?,? ...)
+
+and L<bind_values> will contain B<ids> values.
+
+
+=head2 hlist
+
+Expands array of hash into Your SQL request. The first argument can
+be list of required keys. Places each group into brackets.
+
+=head3 Example
+
+
+    INSERT INTO
+        tbl
+            ('a', 'b')
+    VALUES
+        <% hlist ['a', 'b'] => @$inserts
+
+
+=head4 Result
+
+
+    INSERT INTO
+        tbl
+            ('a', 'b')
+    VALUES
+        (?, ?), (?, ?) ...
+
+
+and L<bind_values> will contain all B<inserts> values.
+
+
+=head2 include
+
+Includes the other SQL-part.
+
+=head3 Example
+
+    % include 'other_sql', argument1 => 1, argument2 => 2;
+
+
+=head1 User's helpers
+
+You can add Your helpers using method L<set_helper>.
+
+=head2 set_helper
+
+Sets (or replaces) helpers.
+
+    $dbh->set_helper(foo => sub { ... }, bar => sub { ... });
+
+Each helper receives template object as the first argument.
+
+Examples:
+
+    $dbh->set_helper(foo_AxB => sub {
+        my ($tpl, $a, $b) = @_;
+        $tpl->quote($a * $b);
+    });
+
+You can use L<quote> and L<immediate> functions inside Your helpers.
+
+If You want use the other helper inside Your helper You have to do that
+by Yourself. To call the other helper You can also use C<< $tpl->call_helper >>
+function.
+
+=head3 call_helper
+
+    $dbh->set_helper(
+        foo => sub {
+            my ($tpl, $a, $b) = @_;
+            $tpl->quote('foo' . $a . $b);
+        },
+        bar => sub {
+            my $tpl = shift;
+            $tpl->call_helper(foo => 'b', 'c');
+        }
     );
-
-Result:
-
-    INSERT INTO tbl (id, value) VALUES (1, 'abc'), (2, 'cde')
-
-=head2 C<?sub{ perl code }>
-
-Eval perl code.
-
-=head3 Example 1
-
-    $sql = q[ INSERT INTO tbl (time) VALUES ?sub{time} ];
-    $dbh->dr_do(q[ INSERT INTO tbl (time) VALUES (?sub{time})  ]);
-
-Result:
-
-    INSERT INTO tbl (time) VALUES (1319638498)
-
-=head2 C<?qsub{ perl code }>
-
-Eval perl code and quote result.
-
-=head3 Example 1
-
-    $sql = q[ INSERT INTO tbl (time) VALUES ?qsub{scalar localtime} ];
-    $dbh->dr_do(q[ INSERT INTO tbl (time) VALUES (?sub{time})  ]);
-
-Result:
-
-    INSERT INTO tbl (time) VALUES ('Thu Oct 27 00:19:14 2011')
-
-=head1 Conditional blocks
-
-=head2 C<?if{path}{block}[{else-block}]> | C<?ifd{path}{block}[{else-block}]> |
-C<?ife{path}{block}[{else-block}]>
-
-If variable defined by 'B<path>' is true (B<if>), defined (B<ifd>) or
-exists (B<ife>), 'B<block>' will be expanded.
-Otherwise 'B<else-block>' will be expanded (if it is present).
-
-=head3 Example 1
-
-    $sql = q[
-        SELECT
-            *
-        FROM
-            tbl
-        WHERE
-            sid = 1
-            ?if{filter}{ AND filter = ?{ filter_value } }
-    ];
-
-    $dbh->dr_rows($sql, filter => 0, filter_value = 123);
-
-Result:
-
-    SELECT * FROM tbl WHERE sid = 1
-
-=head3 Example 2
-
-    $sql = q[
-        SELECT
-            *
-        FROM
-            tbl
-        WHERE
-            sid = 1
-            ?if{filter}{ AND filter = ?{ filter_value } }
-    ];
-
-    $dbh->dr_rows($sql, filter => 1, filter_value = 123);
-
-Result:
-
-    SELECT * FROM tbl WHERE sid = 1 AND filter = 123
-
-=head3 Example 3
-
-    $sql = q[
-        SELECT
-            *
-        FROM
-            tbl
-        WHERE
-            sid = 1
-            AND filter
-                ?ifd{filter}{ = ?{ filter } }{ IS NULL }
-    ];
-
-    $dbh->dr_rows($sql, filter => 1)
-
-Result:
-
-    SELECT * FROM tbl WHERE sid = 1 AND filter = 1
-
-=head3 Example 4
-
-    $sql = q[
-        SELECT
-            *
-        FROM
-            tbl
-        WHERE
-            sid = 1
-            AND filter
-                ?ifd{filter}{ = ?{ filter } }{ IS NULL }
-    ];
-
-    $dbh->dr_rows($sql, filter => undef);
-
-Result:
-
-    SELECT * FROM tbl WHERE sid = 1 AND filter IS NULL
 
 =head1 COPYRIGHT
 

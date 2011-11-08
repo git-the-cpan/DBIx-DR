@@ -3,4 +3,4 @@ SELECT
 FROM
     tbl
 WHERE
-    id IN (?@{ids})
+    id IN (<% list @$ids %>)

@@ -166,6 +166,41 @@ sub last {
     return;
 }
 
+
+sub push {
+    my ($self, $k, $v) = @_;
+
+    if ($self->{is_hash}) {
+        croak 'Usage $it->push(key => $value)' unless @_ >= 3;
+        croak 'Value is undefined' unless defined $v;
+        croak "Value isn't HASHREF or object"
+            unless 'HASH' eq ref $v or blessed $v;
+        $self->{count}++ unless exists $self->{fetch}{$k};
+        $self->{fetch}{$k} = $v;
+        $self->is_changed(1);
+        return;
+    }
+
+    croak "Value isn't defined" unless defined $k;
+    croak "Value isn't HASHREF or object"
+        unless 'HASH' eq ref $k or blessed $k;
+    push @{ $self->{fetch} }, $k;
+    $self->{count}++;
+}
+
+
+sub find {
+    my ($self, $field, $value) = @_;
+
+    $self->reset;
+    while(my $item = $self->next) {
+        return $item if $item->$field ~~ $value;
+    }
+    return;
+}
+
+
+
 package DBIx::DR::Iterator::Item;
 use Scalar::Util ();
 use Carp ();
@@ -314,6 +349,19 @@ Resets internal iterator (that is used by L<next>).
 =head2 all
 
 Returns all elements (as an array).
+
+=head2 push
+
+Pushes one element into iterator.
+
+If You use HASH-iterator You have to note key name.
+
+=head3 Example
+
+    $hiter->push(abc => { id => 1 });
+    $hiter->push(abc => $oiter->get('abc'));
+
+    $aiter->push({ id => 1 });
 
 =head1 DBIx::DR::Iterator::Item
 

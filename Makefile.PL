@@ -6,7 +6,8 @@ WriteMakefile(
     NAME              => 'DBIx::DR',
     VERSION_FROM      => 'lib/DBIx/DR.pm', # finds $VERSION
     PREREQ_PM         => {
-        DBI         => 1.4
+        DBI         => 1.4,
+        Mouse       => 0,
     },
     ABSTRACT_FROM  => 'lib/DBIx/DR.pm', # retrieve abstract from module
     AUTHOR         => 'Dmitry E. Oboukhov <unera@debian.org>',
