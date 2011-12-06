@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 61;
+use Test::More tests    => 65;
 use Encode qw(decode encode);
 
 
@@ -154,6 +154,19 @@ $res = $dbh->single('SELECT <%= bar %> AS bar');
 ok $res->bar eq 'foobar', 'User helper (call the other helper)';
 
 
+$res = eval { $dbh->perform(-f => 'unknown_function') };
+my $e = $@ // '';
+ok $e, 'Exception';
+my ($line) = $e =~ /unknown_function\.sql\.ep\s+line\s+(\d+)/;
+diag $e unless ok $line, '"at line" is present';
+
+my $fname = catfile($test_dir, 'unknown_function.sql.ep');
+ok -f $fname, $fname;
+open my $fh, '<', $fname;
+my @lines = <$fh>;
+my ($line_real) = grep { $lines[$_] =~ /UNKNOWN_FUNCTION/ } 0 .. $#lines;
+$line_real++;
+cmp_ok $line, '==', $line_real, 'Exception point';
 
 
 package MyItemPackage;

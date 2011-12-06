@@ -6,6 +6,7 @@ package DBIx::DR::PerlishTemplate;
 use Mouse;
 use Carp;
 use Scalar::Util;
+use DBIx::DR::ByteStream;
 
 has     line_tag        => (is => 'rw', isa => 'Str',   default => '%');
 has     open_tag        => (is => 'rw', isa => 'Str',   default => '<%');
@@ -21,31 +22,15 @@ has     template_file   => (is => 'rw', isa => 'Str',   default => '');
 has     utf8_open       => (is => 'rw', isa => 'Bool',  default => 1);
 
 has     stashes         => (is => 'ro', isa => 'ArrayRef');
-has     do_croak        => (is => 'ro', isa => 'Bool');
 has     pretokens       => (is => 'ro', isa => 'ArrayRef');
 has     prepretokens    => (is => 'ro', isa => 'ArrayRef');
 has     parsed_template => (is => 'ro', isa => 'Str',   default => '');
 has     namespace       => (is => 'rw', isa => 'Str',
                         default => 'DBIx::DR::PerlishTemplate::Sandbox');
 
+
 sub _render {
-    my $_PTPL = shift;
-
-    local $SIG{__DIE__} = sub {
-        my $msg = $_PTPL->_fatal_message($_[0]);
-        croak $msg if $_PTPL->do_croak;
-        die $msg;
-    };
-
-    local $SIG{__WARN__} = sub {
-        my $msg = $_PTPL->_fatal_message($_[0]);
-        if ($_PTPL->do_croak) {
-            carp $msg;
-            return;
-        };
-        warn $msg;
-    };
-
+    my ($_PTPL) = @_;
     my $_PTSUB;
 
     unless ($_PTPL->parsed_template) {
@@ -54,13 +39,29 @@ sub _render {
         $_PTSUB = $_PTPL->parsed_template;
     }
 
-
-#     printf "=%d========\n%s\n=============\n", $_PTPL->pre_lines, $_PTSUB;
-
     $_PTPL->{parsed_template} = $_PTSUB;
 
     my $esub = eval $_PTSUB;
-    die $@ if $@;
+    if (my $e = $@) {
+        my $do_croak;
+        my $template;
+        if ($_PTPL->template_file) {
+            $template = $_PTPL->template_file;
+        } else {
+            $do_croak = 1;
+            $template = 'inline template';
+        };
+        $e =~ s{ at .*?line (\d+)(\.\s*|,\s+.*?)?$}
+            [" at $template line " . ( $1 - $_PTPL->pre_lines )]gsme;
+
+        if ($1) {
+            $e =~ s/\s*$/\n/g;
+            die $e unless $do_croak;
+            croak $e;
+        }
+
+        croak "$e at $template";
+    }
 
     $_PTPL->{sql} = '';
     $_PTPL->{variables} = [];
@@ -107,27 +108,6 @@ sub clean_preprepends {
     $self;
 }
 
-sub _fatal_message($@) {
-    my ($self, $msg) = @_;
-
-    my $template;
-    if ($self->template_file) {
-        $template = $self->template_file;
-        $self->{do_croak} = 0;
-    } else {
-        $self->{do_croak} = 1;
-        $template = 'inline template';
-    };
-
-#     print "================= $msg =======\n". $self->prepend . $self->preprepend . "=======\n";
-    $msg =~ s{ at .*?line (\d+)(\.\s*|,\s+.*?)?$}
-        [" at $template line " . ( $1 - $self->pre_lines ) . $2]gsme;
-#     print "================= $msg =======\n". $self->pre_lines . "\n";
-
-    return $msg if $1;
-    $self->{do_croak} = 1;
-    return "$msg\n at $template\n";
-}
 
 sub immediate {
     my ($self, $str) = @_;
@@ -136,7 +116,7 @@ sub immediate {
     } else {
         $self->{sql} .= $str;
     }
-    return $self;
+    return DBIx::DR::ByteStream->new('');
 }
 
 sub add_bind_value {
@@ -153,7 +133,7 @@ sub quote {
 
     $self->{sql} .= '?';
     $self->add_bind_value($variable);
-    return $self;
+    return DBIx::DR::ByteStream->new('');
 }
 
 
@@ -270,7 +250,7 @@ sub prepend {
 sub pre_lines {
     my ($self) = @_;
     my $lines = 0;
-    $lines += @{[ /\n/g ]} for $self->preprepend;
+    $lines += @{[ /\n/g ]} for ($self->preprepend, $self->prepend);
     return $lines;
 }
 

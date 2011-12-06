@@ -22,3 +22,10 @@ Revision history for Perl extension DBIx::DR
       - rewite documentation
 0.12  Tue Nov  8 14:54:15 MSK 2011
     - a few fixes in perldoc
+
+0.14  Tue Dec  6 15:43:53 MSK 2011
+    - skip 0.13 version ;)
+    - signals are passed more properly.
+    - You can do typo <%= quote 'abc' %> instead <% quote 'abc'; %>
+      but You can't use semicolon in the first case.
+    - Some perldoc fixes.

@@ -7,7 +7,7 @@ use DBIx::DR::Util ();
 use DBIx::DR::PlPlaceHolders;
 
 package DBIx::DR;
-our $VERSION = '0.12';
+our $VERSION = '0.14';
 use base 'DBI';
 use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
@@ -65,12 +65,19 @@ sub _dr_extract_args_ep {
         %args = @_;
     }
 
-    my $iterator = $args{-iterator} || $self->{'private_DBIx::DR_iterator'};
-    my $item = $args{-item} || $self->{'private_DBIx::DR_item'};
-
-    croak "Iterator class was not defined" unless $iterator;
-    croak "Item class was not definded" unless $item;
     croak "SQL wasn't defined" unless @sql or $args{-f};
+
+    my ($iterator, $item);
+
+    unless ($args{-noiterator}) {
+        $iterator = $args{-iterator} || $self->{'private_DBIx::DR_iterator'};
+        croak "Iterator class was not defined" unless $iterator;
+
+        unless($args{-noitem}) {
+            $item = $args{-item} || $self->{'private_DBIx::DR_item'};
+            croak "Item class was not definded" unless $item;
+        }
+    }
 
     return (
         $self,
@@ -91,31 +98,29 @@ sub select {
 
     my $res;
 
+    local $SIG{__DIE__} = sub { croak @_ };
+
     if (exists $args->{-hash}) {
-        $res = eval {
-            $self->selectall_hashref(
+        $res = $self->selectall_hashref(
                 $req->sql,
                 $args->{-hash},
                 $args->{-dbi},
                 $req->bind_values
             );
-        };
-
-        croak $@ if $@;
 
     } else {
         my $dbi = $args->{-dbi} // {};
         croak "argument '-dbi' must be HASHREF or undef"
             unless 'HASH' eq ref $dbi;
-        $res = eval {
-            $self->selectall_arrayref(
+        $res = $self->selectall_arrayref(
                 $req->sql,
                 { %$dbi, Slice => {} },
                 $req->bind_values
             );
-        };
-        croak $@ if $@;
     }
+
+
+    return $res unless $iterator;
 
     my ($class, $method) = camelize $iterator;
 
@@ -130,19 +135,17 @@ sub single {
         %$args
     );
 
-    my $res = eval {
-        $self->selectrow_hashref(
+    local $SIG{__DIE__} = sub { croak @_ };
+    my $res = $self->selectrow_hashref(
             $req->sql,
             $args->{-dbi},
             $req->bind_values
         );
-    };
-    croak $@ if $@;
 
     return unless $res;
 
     my ($class, $method) = camelize $item;
-    return $class->$method($res, undef) if $method;
+    return $class->$method($res) if $method;
     return bless $res => $class;
 }
 
@@ -153,15 +156,12 @@ sub perform {
         %$args
     );
 
-    my $res = eval {
-        $self->do(
+    local $SIG{__DIE__} = sub { croak @_ };
+    my $res = $self->do(
             $req->sql,
             $args->{-dbi},
             $req->bind_values
         );
-    };
-    croak $@ if $@;
-
     return $res;
 }
 
@@ -350,7 +350,7 @@ B<Result>
     WHERE
         id = ?
 
-and L<bindlist> will contain B<id> value.
+and B<bindlist> will contain B<id> value.
 
 If You use L<DBIx::DR::ByteStream> in place of string
 the function will recall L<immediate> function.

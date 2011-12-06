@@ -131,7 +131,7 @@ sub exists {
 
 
 sub all {
-    my ($self) = @_;
+    my ($self, $field) = @_;
     return unless defined wantarray;
     my @res;
     if ($self->{is_array}) {
@@ -141,6 +141,9 @@ sub all {
     } else {
         push @res => $self->get($_) for keys %{ $self->{fetch} };
     }
+
+    @res = map { $_->$field } @res if $field;
+
     return @res;
 }
 
@@ -349,6 +352,14 @@ Resets internal iterator (that is used by L<next>).
 =head2 all
 
 Returns all elements (as an array).
+
+If You notice an argument it will extract specified fields:
+
+    my @ids = $it->all('id');
+
+The same as:
+
+    my @ids = map { $_->id } $it->all;
 
 =head2 push
 

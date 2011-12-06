@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 74;
+use Test::More tests    => 80;
 use Encode qw(decode encode);
 
 
@@ -86,7 +86,23 @@ my @inline_tests = (
         died        => 0,
     },
     {
+        sql         => q{<%= quote 'abc' %>},
+        variables   => [],
+        like        => qr{^\?$},
+        bind_values => ['abc'],
+        name        => 'Function quote',
+        died        => 0,
+    },
+    {
         sql         => q{<% immediate 'cde'; %>},
+        variables   => [],
+        like        => qr{^cde$},
+        bind_values => [],
+        name        => 'Function immediate',
+        died        => 0,
+    },
+    {
+        sql         => q{<%= immediate 'cde' %>},
         variables   => [],
         like        => qr{^cde$},
         bind_values => [],
@@ -301,3 +317,13 @@ for my $t (@file_tests) {
     }
 
 }
+
+=head1 COPYRIGHT
+
+ Copyright (C) 2011 Dmitry E. Oboukhov <unera@debian.org>
+ Copyright (C) 2011 Roman V. Nikolaev <rshadow@rambler.ru>
+
+ This program is free software, you can redistribute it and/or
+ modify it under the terms of the Artistic License version 2.0.
+
+=cut
