@@ -174,8 +174,8 @@ sub _put_token {
     my $variable;
 
     if ($token->{type} eq 'text') {
-        $content =~ s/\}/\\}/g;
-        return 'immediate(q{' . $content . '});';
+        $content =~ s/'/\\'/g;
+        return "immediate('" . $content . "');";
     }
 
     my $eot = $token->{line} ? "\n" : '';

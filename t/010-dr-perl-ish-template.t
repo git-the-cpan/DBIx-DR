@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 38;
+use Test::More tests    => 42;
 use Encode qw(decode encode);
 
 
@@ -116,6 +116,17 @@ my @tests = (
         sql         => qr[^(\s*\?,){10}\s*$]s,
         vars        => [ 1 .. 10 ],
         name        => 'foreach',
+    },
+    {
+        template    => q^
+            SELECT
+                '{abc}'::text[] AS "array"
+        ^,
+        prepend     => [],
+        args        => [],
+        sql         => qr[SELECT\s+'\{abc\}']s,
+        vars        => [],
+        name        => '{} brackets',
     },
 );
 

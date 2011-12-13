@@ -29,3 +29,6 @@ Revision history for Perl extension DBIx::DR
     - You can do typo <%= quote 'abc' %> instead <% quote 'abc'; %>
       but You can't use semicolon in the first case.
     - Some perldoc fixes.
+
+0.15  Tue Dec 13 14:36:34 MSK 2011
+    - fix {}-brackets bug in SQL-body.
