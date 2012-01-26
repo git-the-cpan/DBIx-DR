@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 42;
+use Test::More tests    => 46;
 use Encode qw(decode encode);
 
 
@@ -29,6 +29,22 @@ ok $tpl, 'DBIx::DR::PerlishTemplate->new';
 
 
 my @tests = (
+    {
+        template    => q{
+            %= 50 - 11
+            +
+            <%==
+                24 / 12
+             %> + <%== 12 / 6 %>
+             %== '+ 1'
+        },
+        prepend     => [],
+        args        => [],
+        sql         => qr{^\s*\?\s*\+\s*2\s*\+\s*2\s*\+\s*1\s*$}s,
+        vars        => [ 39 ],
+        name        => 'Immediate substitutions',
+    },
+
     {
         template    => '%= 13 / 8',
         prepend     => [],

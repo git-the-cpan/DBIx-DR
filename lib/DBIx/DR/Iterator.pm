@@ -19,17 +19,15 @@ sub new {
         $is_array = 1;
         if ($count = @$fetch) {
             croak 'You must use array of hashrefs'
-                unless 'HASH' eq ref $fetch->[0];
+                unless 'HASH' eq ref $fetch->[0] or blessed $fetch->[0];
         }
     } elsif ('HASH' eq ref $fetch) {
         $is_hash = 1;
         my ($k) = each %$fetch;
         if ($count = keys %$fetch) {
             croak 'You must use hash of hashrefs'
-                unless 'HASH' eq ref $fetch->{$k};
+                unless 'HASH' eq ref $fetch->{$k} or blessed $fetch->{$k};
         }
-
-
     } else {
         croak "You should bless 'HASHREF' or 'ARRAYREF' value";
     }
@@ -73,7 +71,7 @@ sub reset {
 }
 
 
-sub next {
+sub next : method {
     my ($self) = @_;
 
     if ($self->{is_array}) {
@@ -147,6 +145,33 @@ sub all {
     return @res;
 }
 
+sub grep : method {
+    my ($self, $key, $value) = @_;
+
+    my $cb;
+    if ('CODE' eq ref $key) {
+        $cb = $key;
+    } else {
+        $cb = sub { $_[0]->$key ~~ $value };
+    }
+
+    my $obj;
+    if ($self->{is_array}) {
+        $obj = [ grep { $cb->($_) } $self->all ];
+    } else {
+        $obj = {
+            map {( $_ => $self->get($_) )}
+                grep { $cb->( $self->get($_) ) }
+                    keys %{ $self->{fetch} }
+        };
+    }
+
+    return $self->new(
+        $obj,
+        -item => decamelize($self->{item_class}, $self->{item_constructor})
+    );
+}
+
 sub first {
     my ($self) = @_;
 
@@ -158,7 +183,7 @@ sub first {
     return;
 }
 
-sub last {
+sub last : method {
     my ($self) = @_;
 
     if ($self->{is_array}) {
@@ -170,7 +195,7 @@ sub last {
 }
 
 
-sub push {
+sub push : method {
     my ($self, $k, $v) = @_;
 
     if ($self->{is_hash}) {
@@ -192,7 +217,7 @@ sub push {
 }
 
 
-sub find {
+sub find : method {
     my ($self, $field, $value) = @_;
 
     $self->reset;
@@ -360,6 +385,12 @@ If You notice an argument it will extract specified fields:
 The same as:
 
     my @ids = map { $_->id } $it->all;
+
+=head2 grep
+
+Constructs new iterator that is subset of parent iterator.
+
+    my $busy = $list->grep(sub { $_[0]->busy ? 1 : 0 });
 
 =head2 push
 

@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 80;
+use Test::More tests    => 86;
 use Encode qw(decode encode);
 
 
@@ -44,6 +44,16 @@ ok $ph->file_suffix eq '.sql.ep', 'Default sql file suffix';
 ok !eval { $ph->sql_transform; 1 }, 'Wrong arguments for sql_transform';
 
 my @inline_tests = (
+    {
+        sql         => q{<%=
+            $variable
+        %>},
+        variables   => [ variable => 123 ],
+        like        => qr{^\?$},
+        bind_values => [ 123 ],
+        name        => 'one variable',
+        died        => 0,
+    },
     {
         sql         => q{<%= $variable %>},
         variables   => [ variable => 123 ],
@@ -83,6 +93,14 @@ my @inline_tests = (
         like        => qr{^\?$},
         bind_values => ['abc'],
         name        => 'Function quote',
+        died        => 0,
+    },
+    {
+        sql         => q{<% quote 'русский'; %>},
+        variables   => [],
+        like        => qr{^\?$},
+        bind_values => ['русский'],
+        name        => 'Function quote utf8',
         died        => 0,
     },
     {

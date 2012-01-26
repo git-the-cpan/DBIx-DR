@@ -10,6 +10,7 @@ use DBIx::DR::ByteStream;
 use Carp ();
 use File::Spec ();
 use Digest::MD5 ();
+use Encode qw(encode);
 
 has sql_dir      => (is => 'bare', isa => 'Str');
 has file_suffix  => (is => 'rw', isa => 'Str', default => '.sql.ep');
@@ -115,8 +116,11 @@ sub sql_transform {
         $opts{-f} = $file;
     }
 
-    $self->{namespace} =
-        __PACKAGE__ . '::Sandbox::t' . Digest::MD5::md5_hex($opts{-f} || $sql);
+
+    my $namespace = $opts{-f} || $sql;
+    $namespace = encode utf8 => $namespace if utf8::is_utf8($namespace);
+    $namespace = Digest::MD5::md5_hex($namespace);
+    $self->{namespace} = __PACKAGE__ . '::Sandbox::t' . $namespace;
 
     $self   ->  clean_prepends
             ->  clean_preprepends

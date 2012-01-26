@@ -144,6 +144,13 @@ sub _parse_token
     my $open_tag       = quotemeta $self->open_tag;
     my $close_tag      = quotemeta $self->close_tag;
 
+    if ($tpl =~ s{$open_tag(.*?)$close_tag}{}s) {
+        return
+            { type => 'text', content =>  $` },
+            { type => 'perl', content =>  $1 },
+            { type => 'text', content =>  $' }
+        ;
+    }
     if ($tpl =~ s{^(\s*)$line_tag(.*?)$}{$1}sm) {
         return
             { type => 'text', content =>  $` . $1 },
@@ -151,13 +158,6 @@ sub _parse_token
             { type => 'text', content =>  $' }
         ;
         next;
-    }
-    if ($tpl =~ s{$open_tag(.*?)$close_tag}{}s) {
-        return
-            { type => 'text', content =>  $` },
-            { type => 'perl', content =>  $1 },
-            { type => 'text', content =>  $' }
-        ;
     }
 
     return {
@@ -216,10 +216,10 @@ sub _parse {
         last unless $found_token;
     }
 
+
     my $sub = join "" => map {
         $self->_put_token($tokens[$_], $_ == $#tokens ? undef : $tokens[$_ + 1])
     } 0 .. $#tokens;
-
 
     return join '',
         'package ', $self->namespace, ';',

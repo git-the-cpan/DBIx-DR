@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 33;
+use Test::More tests    => 66;
 use Encode qw(decode encode);
 
 
@@ -26,7 +26,8 @@ my $href = {
     a => {id => 'a', value => 1 },
     b => {id => 'b', value => 2 },
     c => {id => 'c', value => 3 },
-    d => {id => 'd', value => 4 }
+    d => {id => 'd', value => 4 },
+    e => {id => 'e', value => 3 },
 };
 
 my $item;
@@ -87,6 +88,34 @@ ok $no == $hiter->count, 'hash was reseted properly';
 
 $item = $hiter->next;
 
+# note explain $hiter;
+
+for my $ss ($hiter->grep(value => 3), $hiter->grep(sub{ $_[0]->value == 3 })) {
+    isa_ok $ss => 'DBIx::DR::Iterator', 'Hash subset';
+    cmp_ok $ss->count, '==', 2, 'count of elements';
+    ok $ss->exists('c'), 'element was grepped properly';
+    ok $ss->exists('e'), 'element was grepped properly';
+    cmp_ok $ss->get('c')->id, 'eq', 'c', 'id';
+    cmp_ok $ss->get('c')->value, 'eq', '3', 'value';
+    cmp_ok $ss->get('e')->id, 'eq', 'e', 'id';
+    cmp_ok $ss->get('e')->value, 'eq', '3', 'value';
+    cmp_ok $ss->{item_class}, 'eq', $aiter->{item_class}, 'Item class';
+    cmp_ok $ss->{item_constructor}, 'eq', $aiter->{item_constructor},
+        'Item constructor';
+}
+
+
+for my $ss($aiter->grep(id => 2), $aiter->grep(sub { $_[0]->id == 2 })) {
+    isa_ok $ss => 'DBIx::DR::Iterator', 'Array subset';
+    cmp_ok $ss->count, '==', 1, 'count of elements';
+    ok $ss->exists(0), 'element was grepped properly';
+    cmp_ok $ss->get(0)->id, '==', 2, 'id';
+    cmp_ok $ss->{item_class}, 'eq', $aiter->{item_class}, 'Item class';
+    cmp_ok $ss->{item_constructor}, 'eq', $aiter->{item_constructor},
+        'Item constructor';
+}
+
+
 ok $item, 'Item extracted';
 ok $item->iterator, 'Item has iterator link';
 undef $hiter;
@@ -114,6 +143,9 @@ ok !$item->iterator->is_changed, "Iterator wasn't changed";
 $item->id([]);
 ok $item->is_changed, 'Field was changed';
 ok $item->iterator->is_changed, 'Iterator was changed, too';
+
+
+
 
 
 =head1 COPYRIGHT

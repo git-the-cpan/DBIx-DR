@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 7;
+use Test::More tests    => 9;
 use Encode qw(decode encode);
 
 
@@ -34,6 +34,20 @@ ok $method eq 'new', 'camelize "dbix-dr-iterator#new": method';
 ($module, $method) = camelize 'dbix-dr-iterator';
 ok $module eq 'DBIx::DR::Iterator', 'camelize "dbix-dr-iterator": module';
 ok !defined $method, 'camelize "dbix-dr-iterator": method';
+
+cmp_ok
+    'test-module-sub_module#new',
+    'eq',
+    decamelize('Test::Module::SubModule', 'new'),
+    'decamelize Test::Module::SubModule->new'
+;
+
+cmp_ok
+    'test',
+    'eq',
+    decamelize('Test'),
+    'decamelize Test'
+;
 
 =head1 COPYRIGHT
 

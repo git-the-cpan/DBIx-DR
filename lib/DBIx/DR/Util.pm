@@ -23,15 +23,16 @@ sub camelize($) {
 }
 
 
-sub decamelize($$) {
+sub decamelize($;$) {
     my ($class, $constructor) = @_;
     for ($class) {
-        s/[A-Z]/_$&/g;
+        s/(?<!^)[A-Z]/_$&/g;
+        s/::_/::/g;
         s/::/-/g;
     }
 
     return lc $class unless $constructor;
-    return lc($class) . "_$constructor";
+    return lc($class) . "#$constructor";
 }
 
 1;

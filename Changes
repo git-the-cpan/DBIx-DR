@@ -32,3 +32,7 @@ Revision history for Perl extension DBIx::DR
 
 0.15  Tue Dec 13 14:36:34 MSK 2011
     - fix {}-brackets bug in SQL-body.
+
+0.16  Thu Jan 26 12:08:00 MSK 2012
+    - fix multiline perl-blocks
+    - add 'grep' function into iterator.
