@@ -36,3 +36,6 @@ Revision history for Perl extension DBIx::DR
 0.16  Thu Jan 26 12:08:00 MSK 2012
     - fix multiline perl-blocks
     - add 'grep' function into iterator.
+
+0.17  Wed Apr 25 15:56:57 MSK 2012
+    - add option 'dr_decode_errors'

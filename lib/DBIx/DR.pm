@@ -7,7 +7,7 @@ use DBIx::DR::Util ();
 use DBIx::DR::PlPlaceHolders;
 
 package DBIx::DR;
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 use base 'DBI';
 use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
@@ -32,6 +32,8 @@ sub connect {
 
     );
 
+    $dbh->{"private_DBIx::DR_dr_decode_errors"} = $attr->{dr_decode_errors};
+
     return $dbh;
 }
 
@@ -41,6 +43,7 @@ use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
 
 package DBIx::DR::db;
+use Encode qw(decode encode);
 use base 'DBI::db';
 use DBIx::DR::Util;
 use File::Spec::Functions qw(catfile);
@@ -98,7 +101,7 @@ sub select {
 
     my $res;
 
-    local $SIG{__DIE__} = sub { croak @_ };
+    local $SIG{__DIE__} = sub { croak $self->_dr_decode_err(@_) };
 
     if (exists $args->{-hash}) {
         $res = $self->selectall_hashref(
@@ -135,7 +138,7 @@ sub single {
         %$args
     );
 
-    local $SIG{__DIE__} = sub { croak @_ };
+    local $SIG{__DIE__} = sub { croak $self->_dr_decode_err(@_) };
     my $res = $self->selectrow_hashref(
             $req->sql,
             $args->{-dbi},
@@ -156,7 +159,7 @@ sub perform {
         %$args
     );
 
-    local $SIG{__DIE__} = sub { croak @_ };
+    local $SIG{__DIE__} = sub { croak $self->_dr_decode_err(@_) };
     my $res = $self->do(
             $req->sql,
             $args->{-dbi},
@@ -164,6 +167,19 @@ sub perform {
         );
     return $res;
 }
+
+
+sub _dr_decode_err {
+    my ($self, @arg) = @_;
+    if ($self->{"private_DBIx::DR_dr_decode_errors"}) {
+        for (@arg) {
+            $_ = eval { decode utf8 => $_ } || $_ unless utf8::is_utf8 $_;
+        }
+    }
+    return @arg if wantarray;
+    return join ' ' => @arg;
+}
+
 
 1;
 
@@ -233,6 +249,10 @@ Default value is 'B<dbix-dr-iterator-item#new>' (decamelized string).
 
 Directory path to seek sql files (If You use dedicated SQLs).
 
+=head2 dr_decode_errors
+
+Decode database errors into utf-8
+
 =head1 METHODS
 
 All methods can receive the following arguments:
@@ -251,10 +271,18 @@ You needn't to use suffixes (B<.sql.ep>) here, but You can.
 It will bless (or construct) row into specified class. See below.
 Default value defined by L<dr_item> argument of B<DBI::connect>.
 
+=item -noitem
+
+Do not bless row into any class.
+
 =item -iterator => 'decamelized_obj_define'
 
 It will bless (or construct) rowset into specified class.
 Default value defined by L<dr_iterator> argument of B<DBI::connect>.
+
+=item -noiterator
+
+Do not bless rowset into any class.
 
 =item -dbi => HASHREF
 
