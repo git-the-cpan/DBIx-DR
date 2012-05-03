@@ -73,7 +73,7 @@ sub BUILD {
                 for my $a (@args) {
                     $tpl->add_bind_value( map { $a->{$_} } @$filter );
                 }
-                return $tpl;
+                return DBIx::DR::ByteStream->new('');
             }
             $tpl->immediate(
                 join ',' => map {
@@ -210,13 +210,17 @@ sub bind_values {
 
 1;
 
+=head1 NAME
+
+DBIx::DR::PlPlaceHolders - template converter for L<DBIx::DR>.
+
 =head1 COPYRIGHT
 
  Copyright (C) 2011 Dmitry E. Oboukhov <unera@debian.org>
  Copyright (C) 2011 Roman V. Nikolaev <rshadow@rambler.ru>
 
  This program is free software, you can redistribute it and/or
- modify it under the terms of the Artistic License version 2.0.
+ modify it under the terms of the Artistic License.
 
 =cut
 

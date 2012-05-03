@@ -1,4 +1,9 @@
 Changes
+debian/changelog
+debian/compat
+debian/control
+debian/copyright
+debian/rules
 lib/DBIx/DR/ByteStream.pm
 lib/DBIx/DR/Iterator.pm
 lib/DBIx/DR/PerlishTemplate.pm

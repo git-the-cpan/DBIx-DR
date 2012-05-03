@@ -39,3 +39,7 @@ Revision history for Perl extension DBIx::DR
 
 0.17  Wed Apr 25 15:56:57 MSK 2012
     - add option 'dr_decode_errors'
+
+0.18  Thu May  3 14:15:22 MSK 2012
+    - make debian package
+    - fix hlist helper

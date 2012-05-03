@@ -7,7 +7,7 @@ use DBIx::DR::Util ();
 use DBIx::DR::PlPlaceHolders;
 
 package DBIx::DR;
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 use base 'DBI';
 use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
@@ -544,7 +544,12 @@ function.
  Copyright (C) 2011 Roman V. Nikolaev <rshadow@rambler.ru>
 
  This program is free software, you can redistribute it and/or
- modify it under the terms of the Artistic License version 2.0.
+ modify it under the terms of the Artistic License.
+
+=head1 VCS
+
+The project is placed git repo on github:
+L<https://github.com/unera/dbix-dr/>
 
 =cut
 

@@ -300,6 +300,10 @@ sub can {
 
 1;
 
+=head1 NAME
+
+DBIx::DR::Iterator - iterator for L<DBIx::DR>.
+
 =head1 SYNOPSIS
 
     my $it = DBIx::DR::Iterator->new($arrayref);
@@ -435,7 +439,7 @@ row's fields the flag will be set. Also iterator's flag will be set.
  Copyright (C) 2011 Roman V. Nikolaev <rshadow@rambler.ru>
 
  This program is free software, you can redistribute it and/or
- modify it under the terms of the Artistic License version 2.0.
+ modify it under the terms of the Artistic License.
 
 =cut
 
