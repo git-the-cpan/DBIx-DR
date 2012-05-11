@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBIx-DR
-version:            0.18
+version:            0.19
 abstract:           easy DBI helper (perl inside SQL and blessed results)
 author:
     - Dmitry E. Oboukhov <unera@debian.org>
