@@ -7,7 +7,7 @@ use DBIx::DR::Util ();
 use DBIx::DR::PlPlaceHolders;
 
 package DBIx::DR;
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 use base 'DBI';
 use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
@@ -91,6 +91,15 @@ sub _dr_extract_args_ep {
     );
 }
 
+
+
+sub _user_sql($@) {
+    my ($sql, @bv) = @_;
+    $sql =~ s/\?/'$_'/ for @bv;
+    return $sql;
+}
+
+
 sub select {
     my ($self, $sql, $args, $item, $iterator) = &_dr_extract_args_ep;
 
@@ -98,6 +107,8 @@ sub select {
         @$sql,
         %$args
     );
+
+    croak _user_sql($req->sql, $req->bind_values) if $args->{'-die'};
 
     my $res;
 
@@ -137,6 +148,8 @@ sub single {
         @$sql,
         %$args
     );
+    
+    croak _user_sql($req->sql, $req->bind_values) if $args->{'-die'};
 
     local $SIG{__DIE__} = sub { croak $self->_dr_decode_err(@_) };
     my $res = $self->selectrow_hashref(
@@ -158,6 +171,8 @@ sub perform {
         @$sql,
         %$args
     );
+    
+    croak _user_sql($req->sql, $req->bind_values) if $args->{'-die'};
 
     local $SIG{__DIE__} = sub { croak $self->_dr_decode_err(@_) };
     my $res = $self->do(
@@ -291,6 +306,10 @@ Additional DBI arguments.
 =item -hash => FIELDNAME
 
 Selects into HASH. Iterator will operate by names (not numbers).
+
+=item -die => 0|1
+
+If B<true> the method will die with SQL-request.
 
 =back
 
