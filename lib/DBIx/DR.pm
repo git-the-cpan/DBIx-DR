@@ -7,7 +7,7 @@ use DBIx::DR::Util ();
 use DBIx::DR::PlPlaceHolders;
 
 package DBIx::DR;
-our $VERSION = '0.21';
+our $VERSION = '0.23';
 use base 'DBI';
 use Carp;
 $Carp::Internal{ (__PACKAGE__) } = 1;
@@ -108,6 +108,7 @@ sub select {
         %$args
     );
 
+    carp  _user_sql($req->sql, $req->bind_values) if $args->{'-warn'};
     croak _user_sql($req->sql, $req->bind_values) if $args->{'-die'};
 
     my $res;
@@ -149,6 +150,7 @@ sub single {
         %$args
     );
     
+    carp  _user_sql($req->sql, $req->bind_values) if $args->{'-warn'};
     croak _user_sql($req->sql, $req->bind_values) if $args->{'-die'};
 
     local $SIG{__DIE__} = sub { croak $self->_dr_decode_err(@_) };
@@ -172,6 +174,7 @@ sub perform {
         %$args
     );
     
+    carp  _user_sql($req->sql, $req->bind_values) if $args->{'-warn'};
     croak _user_sql($req->sql, $req->bind_values) if $args->{'-die'};
 
     local $SIG{__DIE__} = sub { croak $self->_dr_decode_err(@_) };
@@ -310,6 +313,10 @@ Selects into HASH. Iterator will operate by names (not numbers).
 =item -die => 0|1
 
 If B<true> the method will die with SQL-request.
+
+=item -warn => 0|1
+
+If B<true> the method will warn with SQL-request.
 
 =back
 
