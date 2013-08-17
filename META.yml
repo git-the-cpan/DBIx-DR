@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               DBIx-DR
-version:            0.23
+version:            0.24
 abstract:           easy DBI helper (perl inside SQL and blessed results)
 author:
     - Dmitry E. Oboukhov <unera@debian.org>
@@ -13,6 +13,7 @@ build_requires:
 requires:
     DBI:    1.4
     Mouse:  0
+resources:          https://github.com/dr-co/dbix-dr
 no_index:
     directory:
         - t
@@ -21,3 +22,4 @@ generated_by:       ExtUtils::MakeMaker version 6.57_05
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4
+bugtracker:         https://github.com/dr-co/dbix-dr/issues
