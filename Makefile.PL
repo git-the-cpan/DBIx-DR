@@ -18,17 +18,10 @@ WriteMakefile(
     LICENSE           => 'Artistic License',
 
     META_MERGE  => {
-        resources => 'https://github.com/dr-co/dbix-dr',
-        bugtracker => 'https://github.com/dr-co/dbix-dr/issues'
+        resources => {
+            repository => 'https://github.com/dr-co/dbix-dr',
+            bugtracker => 'https://github.com/dr-co/dbix-dr/issues'
+        }
     }
 );
 
-if (open my $file, '+<', 'Makefile') {
-    my @lines = <$file>;
-    seek $file, 0, 0;
-    truncate $file, 0;
-    for (@lines) {
-        $_ = "TEST_VERBOSE=1\n" if /^TEST_VERBOSE\s*=\s*.*/;
-        print $file $_;
-    }
-}

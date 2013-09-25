@@ -24,4 +24,5 @@ t/sql/select_ids.sql.ep
 t/sql/unknown_function.sql.ep
 t/sql/usual_select.sql.ep
 LICENSE
-META.yml                                 Module meta-data (added by MakeMaker)
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)
